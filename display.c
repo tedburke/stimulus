@@ -1,11 +1,16 @@
 //
-// display.c - written by Ted Burke - last modified 15-12-2009
+// display.c - written by Ted Burke - last modified 16-12-2009
 //
 // This program loads an animated stimulus from a sequence of
 // numbered BMP files (one frame per file, 512x512 pixels, 24-bit).
 // The frames are displayed very rapidly in sequence on the screen.
-// The frame rate is currently exceeding the refresh rate on this
-// computer (60Hz), but I'm trying to find a way to synchronise it.
+//
+// The following is a typical command line:
+//
+//		display.exe 100 1280x800:32@60
+//
+// which tells the program to load files from 1.bmp to 100.bmp and
+// specifies a screen size of 1280x800 @ 60Hz refresh rate and 32bpp.
 //
 
 #include <windows.h>
@@ -15,12 +20,10 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 
-// Frames info
-//#define number_of_frames 500
+// Default frames info
 int number_of_frames = 2;
 #define frame_width 512
 #define frame_height 512
-//GLuint textures[number_of_frames];
 GLuint *textures;
 
 // Default screen size and display parameters
@@ -192,7 +195,7 @@ void display(void)
 	glVertex2i(screen_width/2 + 5, screen_height/2 + 5);
 	glVertex2i(screen_width/2 - 5, screen_height/2 + 5);
 	glEnd();
-
+	
 	glutSwapBuffers();
 
 	// Redraw again as soon as possible
