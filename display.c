@@ -162,6 +162,7 @@ void display(void)
 
 	// Texture render method
 	glBindTexture(GL_TEXTURE_2D, textures[n]);
+	//Slower cycling: glBindTexture(GL_TEXTURE_2D, textures[(frames_rendered/30)%number_of_frames]);
 	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0.0, 0.0);
