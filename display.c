@@ -16,14 +16,17 @@
 #include <GL/glut.h>
 
 // Frames info
-#define number_of_frames 4
+//#define number_of_frames 500
+int number_of_frames = 2;
 #define frame_width 512
 #define frame_height 512
-GLuint textures[number_of_frames];
+//GLuint textures[number_of_frames];
+GLuint *textures;
 
-// Initial window size
-int window_width = 1024;
-int window_height = 768;
+// Default screen size and display parameters
+int screen_width = 1024, screen_height = 768;
+int pixel_depth = 32, refresh_rate = 60;
+int image_offset_x, image_offset_y;
 int main_window; // GLUT window id
 
 // Callback function prototypes
@@ -36,26 +39,62 @@ GLuint frames_rendered = 0;
 
 // Main function
 int main(int argc, char *argv[])
-{		
-	// start GLUT in fullscreen game mode
+{	
+	// Parse any GLUT specific command line arguments
 	glutInit(&argc, argv);
+	
+	// Parse other command line arguments
+	// Was the number of frames specfied on command line?
+	if (argc > 1)
+	{
+		number_of_frames = atoi(argv[1]);
+	}
+	
+	char game_mode_string[50];
+
+	if (argc > 2)
+	{
+		// Copy second command line argument into game_mode_string
+		// and extract parameter values
+		sprintf(game_mode_string, "%s", argv[2]);
+	}
+	else
+	{
+		sprintf(game_mode_string, "%dx%d:%d@%d", screen_width, screen_height, pixel_depth, refresh_rate);
+		// Faster, but no vsync: sprintf(game_mode_string, "%dx%d:8@60", screen_width, screen_height);
+	}
+	
+	// Start GLUT in fullscreen game mode
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutGameModeString("1024x768:16@60");
+	glutGameModeString(game_mode_string);
 	main_window = glutEnterGameMode();
 	glutKeyboardFunc(keyboard);
 	glutDisplayFunc(display);
 	glClearColor (0.5, 0.5, 0.5, 1.0);
+
+	// Read and display actual game mode parameters
+	screen_width = glutGameModeGet(GLUT_GAME_MODE_WIDTH);
+	screen_height = glutGameModeGet(GLUT_GAME_MODE_HEIGHT);
+	pixel_depth = glutGameModeGet(GLUT_GAME_MODE_PIXEL_DEPTH);
+	refresh_rate = glutGameModeGet(GLUT_GAME_MODE_REFRESH_RATE);
+	image_offset_x = (screen_width - frame_width) / 2;
+	image_offset_y = (screen_height - frame_height) / 2;
+	printf("screen_width = %d\n", screen_width);
+	printf("screen_height = %d\n", screen_height);
+	printf("pixel_depth = %d\n", pixel_depth);
+	printf("refresh_rate = %d\n", refresh_rate);
 	
 	// Select an orthogonal projection
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluOrtho2D(0, window_width, 0, window_height);
+	gluOrtho2D(0, screen_width, 0, screen_height);
 
 	// Load frames
 	FILE *image_file;
 	char file_name[12];
-
+	
 	// Create a texture for each frame of the stimulus
+	textures = malloc(number_of_frames * sizeof(GLuint));
 	glGenTextures(number_of_frames, textures);	
 	static GLubyte frame[frame_width * frame_height * 4];
 	int n, m;
@@ -85,12 +124,14 @@ int main(int argc, char *argv[])
 		glBindTexture(GL_TEXTURE_2D, textures[n]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		// NB This seems to work best when the textures are stored internally
+		// as RGBA pixel values.
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame_width, frame_height, 0,
 						GL_RGBA, GL_UNSIGNED_BYTE, frame);
 	}
 
 	// Enable textures
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D);
 	
 	// GLUT main loop
 	glutMainLoop();
@@ -105,33 +146,68 @@ void display(void)
 	static int n = 0;
 	if (++n >= number_of_frames) n = 0;
 	
-	// offset to centre the image on screen
-	static int x = 256, y = 128;
+	// Slide image to the right 1 pixel to visualise frame rate as speed of motion
+	//if (++image_offset_x >= screen_width - 512) image_offset_x = 0;
 	
+	// Clearing background doesn't seem to be slowing the program
+	// down on this (newer) computer, so I'm putting it back in for
+	// the moment.
+	glClear(GL_COLOR_BUFFER_BIT);
+	
+	// Enable textures
+	glEnable(GL_TEXTURE_2D);
+
 	// Texture render method
 	glBindTexture(GL_TEXTURE_2D, textures[n]);
-	//glColor4f(1.0, 1.0, 1.0, 1.0);
+	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0.0, 0.0);
-	glVertex2i(x, y);
+	glVertex2i(image_offset_x, image_offset_y);
 	glTexCoord2f(1.0, 0.0);
-	glVertex2i(x + frame_width, y);
+	glVertex2i(image_offset_x + frame_width, image_offset_y);
 	glTexCoord2f(1.0, 1.0);
-	glVertex2i(x + frame_width, y + frame_height);
+	glVertex2i(image_offset_x + frame_width, image_offset_y + frame_height);
 	glTexCoord2f(0.0, 1.0);
-	glVertex2i(x, y + frame_height);
+	glVertex2i(image_offset_x, image_offset_y + frame_height);
+	glEnd();
+
+	// Disable textures
+	glDisable(GL_TEXTURE_2D);	
+	
+	// Show flashing box at bottom left
+	int c = frames_rendered%2;
+	glColor4f(c, c, c, 1.0);
+	glBegin(GL_QUADS);
+	glVertex2i(0, 0);
+	glVertex2i(50, 0);
+	glVertex2i(50, 50);
+	glVertex2i(0, 50);
 	glEnd();
 	
-	//glFlush ();
+	// Show red dot at centre of stimulus
+	glColor4f(1, 0, 0, 1.0);
+	glBegin(GL_QUADS);
+	glVertex2i(screen_width/2 - 5, screen_height/2 - 5);
+	glVertex2i(screen_width/2 + 5, screen_height/2 - 5);
+	glVertex2i(screen_width/2 + 5, screen_height/2 + 5);
+	glVertex2i(screen_width/2 - 5, screen_height/2 + 5);
+	glEnd();
+
 	glutSwapBuffers();
-	
+
 	// Redraw again as soon as possible
 	glutPostRedisplay();
 	
+	// Make sure background is clear in front and back buffers
+	// This is important if the background is not being cleared
+	// each time a frame is rendered - see above.
+	if (frames_rendered < 2) glClear(GL_COLOR_BUFFER_BIT);
+
 	// Increment frame counter
 	if (first_frame_time == 0)
 	{
-		glClear(GL_COLOR_BUFFER_BIT);
+		// Remember time that first frame finished rendering,
+		// then count all subsequent frames rendered.
 		first_frame_time = GetTickCount();
 	}
 	else frames_rendered++;
@@ -149,6 +225,7 @@ void keyboard(unsigned char key, int x, int y)
 		
 		// Delete the stimulus texture frames and the GLUT window
 		glDeleteTextures(number_of_frames, textures);
+		free(textures);
 		glutDestroyWindow(main_window);
 	
 		// Quit the program
